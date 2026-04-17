@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/bikidas/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/discovery"
 	"github.com/spf13/cobra"
 )
 

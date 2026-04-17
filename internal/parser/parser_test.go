@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bikidas/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/discovery"
 )
 
 func TestParsePython(t *testing.T) {

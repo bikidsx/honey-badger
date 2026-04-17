@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bikidas/honey-badger/internal/cpg"
-	"github.com/bikidas/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/cpg"
+	"github.com/bikidsx/honey-badger/internal/discovery"
 )
 
 // Severity levels for findings.

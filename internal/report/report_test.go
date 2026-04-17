@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bikidas/honey-badger/internal/discovery"
-	"github.com/bikidas/honey-badger/internal/vulnquery"
+	"github.com/bikidsx/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/vulnquery"
 )
 
 func sampleFindings() []vulnquery.Finding {

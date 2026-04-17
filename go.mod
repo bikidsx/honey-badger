@@ -1,4 +1,4 @@
-module github.com/bikidas/honey-badger
+module github.com/bikidsx/honey-badger
 
 go 1.26.2
 

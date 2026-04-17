@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bikidas/honey-badger/internal/cpg"
-	"github.com/bikidas/honey-badger/internal/discovery"
-	"github.com/bikidas/honey-badger/internal/parser"
-	"github.com/bikidas/honey-badger/internal/report"
-	"github.com/bikidas/honey-badger/internal/vulnquery"
+	"github.com/bikidsx/honey-badger/internal/cpg"
+	"github.com/bikidsx/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/parser"
+	"github.com/bikidsx/honey-badger/internal/report"
+	"github.com/bikidsx/honey-badger/internal/vulnquery"
 )
 
 func testdataDir(t *testing.T) string {

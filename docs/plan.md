@@ -58,7 +58,7 @@
 
 ### Exit criteria
 
-- `go install github.com/bikidas/honey-badger@latest` works
+- `go install github.com/bikidsx/honey-badger@latest` works
 - CI green on all 3 platforms
 - Release v0.1.0 tagged
 

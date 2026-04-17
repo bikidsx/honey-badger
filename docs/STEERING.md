@@ -8,7 +8,7 @@
 
 **Honey Badger** (`hb`) is a repository-level, language-agnostic, semantics-first codebase security analysis CLI. It builds a Code Property Graph from an entire codebase and finds vulnerabilities that span files and functions.
 
-**Module path:** `github.com/bikidas/honey-badger`
+**Module path:** `github.com/bikidsx/honey-badger`
 **Language:** Go 1.22+ (developed on 1.26.2)
 **License:** MIT
 **Binary name:** `hb`

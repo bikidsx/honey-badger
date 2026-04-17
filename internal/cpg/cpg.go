@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bikidas/honey-badger/internal/discovery"
-	"github.com/bikidas/honey-badger/internal/parser"
+	"github.com/bikidsx/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/parser"
 )
 
 // NodeKind classifies CPG nodes.

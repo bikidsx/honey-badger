@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/bikidas/honey-badger/cmd"
+	"github.com/bikidsx/honey-badger/cmd"
 )
 
 func main() {

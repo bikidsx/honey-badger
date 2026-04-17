@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/bikidas/honey-badger/internal/vulnquery"
+	"github.com/bikidsx/honey-badger/internal/vulnquery"
 )
 
 // --- SARIF types (v2.1.0) ---
@@ -135,7 +135,7 @@ func WriteSARIF(w io.Writer, findings []vulnquery.Finding, version string) error
 				Driver: SARIFDriver{
 					Name:           "Honey Badger",
 					Version:        version,
-					InformationURI: "https://github.com/bikidas/honey-badger",
+					InformationURI: "https://github.com/bikidsx/honey-badger",
 					Rules:          rules,
 				},
 			},

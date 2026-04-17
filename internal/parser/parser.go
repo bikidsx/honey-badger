@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bikidas/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/discovery"
 	"github.com/odvcencio/gotreesitter"
 	"github.com/odvcencio/gotreesitter/grammars"
 )

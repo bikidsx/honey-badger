@@ -3,8 +3,8 @@ package cpg
 import (
 	"testing"
 
-	"github.com/bikidas/honey-badger/internal/discovery"
-	"github.com/bikidas/honey-badger/internal/parser"
+	"github.com/bikidsx/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/parser"
 )
 
 func sampleParseResults() []*parser.ParseResult {
