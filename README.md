@@ -27,7 +27,7 @@ Honey Badger builds a **Code Property Graph** from your entire repository and re
 
 ```bash
 # Install
-go install github.com/bikidas/honey-badger@latest
+go install github.com/bikidsx/honey-badger@latest
 
 # Scan a codebase
 hb scan ./my-app
@@ -149,7 +149,7 @@ hb scan ./my-app
 ```yaml
 - name: Security Scan
   run: |
-    go install github.com/bikidas/honey-badger@latest
+    go install github.com/bikidsx/honey-badger@latest
     hb scan . --ci --fail-on=high -o sarif > results.sarif
 
 - name: Upload SARIF
@@ -162,7 +162,7 @@ hb scan ./my-app
 
 ```bash
 # Clone
-git clone https://github.com/bikidas/honey-badger.git
+git clone https://github.com/bikidsx/honey-badger.git
 cd honey-badger
 
 # Run tests
@@ -172,7 +172,7 @@ go test ./...
 go build -o hb .
 
 # Build with version
-go build -ldflags "-X github.com/bikidas/honey-badger/cmd.Version=v0.1.0" -o hb .
+go build -ldflags "-X github.com/bikidsx/honey-badger/cmd.Version=v0.1.0" -o hb .
 ```
 
 ### Test Coverage
