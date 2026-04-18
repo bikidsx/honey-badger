@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/bikidsx/honey-badger/internal/cpg"
 	"github.com/bikidsx/honey-badger/internal/discovery"
@@ -37,7 +38,7 @@ func runUnderstand(cmd *cobra.Command, args []string) error {
 	// Parse
 	var results []*parser.ParseResult
 	for _, f := range disc.Files {
-		pr, err := parser.ParseFile(f.Path, f.Language)
+		pr, err := parser.ParseFile(filepath.Join(disc.Root, f.Path), f.Language)
 		if err != nil {
 			continue
 		}

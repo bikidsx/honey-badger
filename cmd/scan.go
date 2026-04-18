@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/bikidsx/honey-badger/internal/cpg"
 	"github.com/bikidsx/honey-badger/internal/discovery"
@@ -85,8 +87,10 @@ func runScan(cmd *cobra.Command, args []string) error {
 		workers = 1
 	}
 
-	jobs := make(chan parseJob, len(disc.Files))
-	resultsCh := make(chan *parser.ParseResult, len(disc.Files))
+	total := len(disc.Files)
+	var parsed int64
+	jobs := make(chan parseJob, total)
+	resultsCh := make(chan *parser.ParseResult, total)
 	var wg sync.WaitGroup
 
 	for i := 0; i < workers; i++ {
@@ -95,6 +99,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 			defer wg.Done()
 			for j := range jobs {
 				pr, err := parser.ParseFile(j.path, j.lang)
+				atomic.AddInt64(&parsed, 1)
 				if err != nil {
 					continue
 				}
@@ -104,9 +109,39 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, f := range disc.Files {
-		jobs <- parseJob{path: f.Path, lang: f.Language}
+		jobs <- parseJob{path: filepath.Join(disc.Root, f.Path), lang: f.Language}
 	}
 	close(jobs)
+
+	// Animated progress bar
+	done := make(chan struct{})
+	go func() {
+		spinner := []string{"▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"}
+		tick := time.NewTicker(100 * time.Millisecond)
+		defer tick.Stop()
+		frame := 0
+		barWidth := 30
+		for {
+			select {
+			case <-done:
+				// Final state
+				fmt.Fprintf(cmd.ErrOrStderr(), "\r   Parsing [%s] %d/%d files ✓\n",
+					strings.Repeat("█", barWidth), total, total)
+				return
+			case <-tick.C:
+				n := int(atomic.LoadInt64(&parsed))
+				pct := float64(n) / float64(total)
+				filled := int(pct * float64(barWidth))
+				bar := strings.Repeat("█", filled)
+				if filled < barWidth {
+					bar += spinner[frame%len(spinner)]
+					bar += strings.Repeat("░", barWidth-filled-1)
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "\r   Parsing [%s] %d/%d files", bar, n, total)
+				frame++
+			}
+		}
+	}()
 
 	go func() {
 		wg.Wait()
@@ -117,6 +152,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	for pr := range resultsCh {
 		results = append(results, pr)
 	}
+	close(done)
 	cmd.Printf("   Parsed %d files\n", len(results))
 
 	// Step 3: Build CPG
