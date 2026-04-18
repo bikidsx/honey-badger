@@ -30,6 +30,10 @@ func TestDetectLanguage(t *testing.T) {
 		{"Dockerfile", Dockerfile},
 		{"Dockerfile.prod", Dockerfile},
 		{"Dockerfile.dev", Dockerfile},
+		{"Main.java", Java},
+		{"UserService.cs", CSharp},
+		{"main.rs", Rust},
+		{"index.php", PHP},
 		{"README.md", Unknown},
 		{"Makefile", Unknown},
 		{"image.png", Unknown},
@@ -244,7 +248,7 @@ func TestScanFileSizes(t *testing.T) {
 
 func TestSupportedLanguages(t *testing.T) {
 	langs := SupportedLanguages()
-	if len(langs) != 9 {
-		t.Errorf("expected 9 supported languages, got %d", len(langs))
+	if len(langs) != 13 {
+		t.Errorf("expected 13 supported languages, got %d", len(langs))
 	}
 }

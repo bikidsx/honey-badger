@@ -21,6 +21,10 @@ const (
 	JSON       Language = "json"
 	HCL        Language = "hcl"
 	Dockerfile Language = "dockerfile"
+	Java       Language = "java"
+	CSharp     Language = "csharp"
+	Rust       Language = "rust"
+	PHP        Language = "php"
 	Unknown    Language = "unknown"
 )
 
@@ -58,6 +62,10 @@ var extMap = map[string]Language{
 	".tf":    HCL,
 	".tfvars": HCL,
 	".hcl":  HCL,
+	".java":  Java,
+	".cs":    CSharp,
+	".rs":    Rust,
+	".php":   PHP,
 }
 
 // defaultIgnoreDirs are directories skipped during discovery.
@@ -162,6 +170,6 @@ func Scan(root string, opts *Options) (*Result, error) {
 // SupportedLanguages returns all languages Honey Badger can detect.
 func SupportedLanguages() []Language {
 	return []Language{
-		Python, JavaScript, TypeScript, Go, SQL, YAML, JSON, HCL, Dockerfile,
+		Python, JavaScript, TypeScript, Go, Java, CSharp, Rust, PHP, SQL, YAML, JSON, HCL, Dockerfile,
 	}
 }

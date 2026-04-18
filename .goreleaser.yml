@@ -1,0 +1,41 @@
+version: 2
+
+builds:
+  - main: ./cmd/hb
+    binary: hb
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/bikidsx/honey-badger/cmd.Version={{.Version}}
+
+archives:
+  - format: tar.gz
+    name_template: "hb_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+release:
+  github:
+    owner: bikidsx
+    name: honey-badger
+  draft: false
+  prerelease: auto
