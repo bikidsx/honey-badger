@@ -213,3 +213,105 @@ func WriteMarkdown(w io.Writer, findings []vulnquery.Finding) error {
 	_, err := io.WriteString(w, b.String())
 	return err
 }
+
+
+// WriteHTML writes findings as a minimal monochrome HTML report.
+func WriteHTML(w io.Writer, findings []vulnquery.Finding) error {
+	counts := make(map[vulnquery.Severity]int)
+	for _, f := range findings {
+		counts[f.Severity]++
+	}
+
+	var b strings.Builder
+	b.WriteString(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Honey Badger — Security Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "SF Mono", "Cascadia Code", "Fira Code", Menlo, Consolas, monospace; background: #fff; color: #111; max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; line-height: 1.6; }
+  h1 { font-size: 1.3rem; font-weight: 700; border-bottom: 2px solid #111; padding-bottom: .5rem; margin-bottom: 1.5rem; }
+  .meta { font-size: .8rem; color: #666; margin-bottom: 2rem; }
+  .summary { display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+  .stat { border: 1px solid #ddd; padding: .6rem 1rem; min-width: 100px; }
+  .stat-num { font-size: 1.4rem; font-weight: 700; }
+  .stat-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #666; }
+  .finding { border: 1px solid #ddd; padding: 1rem 1.2rem; margin-bottom: .75rem; }
+  .finding:hover { border-color: #111; }
+  .finding-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .4rem; }
+  .finding-id { font-weight: 700; font-size: .85rem; }
+  .sev { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; padding: .15rem .5rem; border: 1px solid; }
+  .sev-critical { border-color: #111; background: #111; color: #fff; }
+  .sev-high { border-color: #111; }
+  .sev-medium { border-color: #999; color: #555; }
+  .sev-low { border-color: #ccc; color: #999; }
+  .sev-info { border-color: #eee; color: #bbb; }
+  .finding-title { font-size: .85rem; font-weight: 600; margin-bottom: .3rem; }
+  .finding-loc { font-size: .75rem; color: #666; }
+  .finding-desc { font-size: .78rem; color: #444; margin-top: .3rem; }
+  .tag { font-size: .65rem; background: #f5f5f5; padding: .1rem .4rem; margin-right: .3rem; }
+  .empty { text-align: center; padding: 3rem; color: #999; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #111; color: #eee; }
+    .stat, .finding { border-color: #333; }
+    .finding:hover { border-color: #eee; }
+    .stat-label, .finding-loc { color: #888; }
+    .finding-desc { color: #aaa; }
+    .tag { background: #222; }
+    .sev-critical { background: #eee; color: #111; border-color: #eee; }
+    .sev-high { border-color: #eee; }
+    .sev-medium { border-color: #666; color: #aaa; }
+    .sev-low { border-color: #444; color: #666; }
+    h1 { border-bottom-color: #eee; }
+    .meta { color: #888; }
+  }
+</style>
+</head>
+<body>
+<h1>🦡 Honey Badger</h1>
+`)
+
+	b.WriteString(fmt.Sprintf(`<p class="meta">%d findings</p>`, len(findings)))
+
+	if len(findings) == 0 {
+		b.WriteString(`<p class="empty">No vulnerabilities found. Honey Badger is satisfied.</p>`)
+	} else {
+		// Summary stats
+		b.WriteString(`<div class="summary">`)
+		for _, sev := range []vulnquery.Severity{vulnquery.Critical, vulnquery.High, vulnquery.Medium, vulnquery.Low, vulnquery.Info} {
+			if c := counts[sev]; c > 0 {
+				b.WriteString(fmt.Sprintf(`<div class="stat"><div class="stat-num">%d</div><div class="stat-label">%s</div></div>`, c, sev))
+			}
+		}
+		b.WriteString(`</div>`)
+
+		// Findings
+		for _, f := range findings {
+			sevClass := "sev-" + string(f.Severity)
+			b.WriteString(`<div class="finding">`)
+			b.WriteString(fmt.Sprintf(`<div class="finding-header"><span class="finding-id">%s</span><span class="sev %s">%s</span></div>`, f.ID, sevClass, f.Severity))
+			b.WriteString(fmt.Sprintf(`<div class="finding-title">%s</div>`, htmlEscape(string(f.Title))))
+			b.WriteString(fmt.Sprintf(`<div class="finding-loc">%s:%d:%d`, htmlEscape(f.File), f.StartRow+1, f.StartCol+1))
+			if f.Language != "" {
+				b.WriteString(fmt.Sprintf(` <span class="tag">%s</span>`, f.Language))
+			}
+			b.WriteString(fmt.Sprintf(` <span class="tag">%s</span>`, f.Class))
+			b.WriteString(`</div>`)
+			if f.Description != "" {
+				b.WriteString(fmt.Sprintf(`<div class="finding-desc">%s</div>`, htmlEscape(f.Description)))
+			}
+			b.WriteString(`</div>`)
+		}
+	}
+
+	b.WriteString(`</body></html>`)
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+func htmlEscape(s string) string {
+	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;")
+	return r.Replace(s)
+}

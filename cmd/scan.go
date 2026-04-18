@@ -3,9 +3,15 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
 
 	"github.com/bikidsx/honey-badger/internal/cpg"
 	"github.com/bikidsx/honey-badger/internal/discovery"
+	"github.com/bikidsx/honey-badger/internal/integrations"
 	"github.com/bikidsx/honey-badger/internal/parser"
 	"github.com/bikidsx/honey-badger/internal/report"
 	"github.com/bikidsx/honey-badger/internal/vulnquery"
@@ -25,6 +31,7 @@ func init() {
 	scanCmd.Flags().StringSlice("langs", nil, "scan only specific languages: python,go,javascript,typescript")
 	scanCmd.Flags().Bool("ci", false, "CI/CD mode — exit 1 if critical vulns found")
 	scanCmd.Flags().String("fail-on", "critical", "severity threshold for CI failure: critical, high, medium, low")
+	scanCmd.Flags().StringSlice("exclude", nil, "directories or file patterns to exclude from scan")
 	rootCmd.AddCommand(scanCmd)
 }
 
@@ -35,17 +42,28 @@ func runScan(cmd *cobra.Command, args []string) error {
 	langs, _ := cmd.Flags().GetStringSlice("langs")
 	ciMode, _ := cmd.Flags().GetBool("ci")
 	failOn, _ := cmd.Flags().GetString("fail-on")
+	exclude, _ := cmd.Flags().GetStringSlice("exclude")
 
 	cmd.Printf("🦡 Honey Badger scanning: %s\n", target)
 
 	// Step 1: Discover files
 	var opts *discovery.Options
-	if len(langs) > 0 {
-		filterLangs := make([]discovery.Language, 0, len(langs))
-		for _, l := range langs {
-			filterLangs = append(filterLangs, discovery.Language(l))
+	if len(langs) > 0 || len(exclude) > 0 {
+		opts = &discovery.Options{}
+		if len(langs) > 0 {
+			filterLangs := make([]discovery.Language, 0, len(langs))
+			for _, l := range langs {
+				filterLangs = append(filterLangs, discovery.Language(l))
+			}
+			opts.FilterLangs = filterLangs
 		}
-		opts = &discovery.Options{FilterLangs: filterLangs}
+		if len(exclude) > 0 {
+			ignoreDirs := make(map[string]bool, len(exclude))
+			for _, e := range exclude {
+				ignoreDirs[e] = true
+			}
+			opts.IgnoreDirs = ignoreDirs
+		}
 	}
 
 	disc, err := discovery.Scan(target, opts)
@@ -54,13 +72,49 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 	cmd.Printf("   Found %d files across %d languages\n", len(disc.Files), len(disc.Stats))
 
-	// Step 2: Parse files
-	var results []*parser.ParseResult
+	// Step 2: Parse files (parallel worker pool)
+	type parseJob struct {
+		path string
+		lang discovery.Language
+	}
+	workers := runtime.GOMAXPROCS(0)
+	if workers > len(disc.Files) {
+		workers = len(disc.Files)
+	}
+	if workers < 1 {
+		workers = 1
+	}
+
+	jobs := make(chan parseJob, len(disc.Files))
+	resultsCh := make(chan *parser.ParseResult, len(disc.Files))
+	var wg sync.WaitGroup
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range jobs {
+				pr, err := parser.ParseFile(j.path, j.lang)
+				if err != nil {
+					continue
+				}
+				resultsCh <- pr
+			}
+		}()
+	}
+
 	for _, f := range disc.Files {
-		pr, err := parser.ParseFile(f.Path, f.Language)
-		if err != nil {
-			continue // skip unparseable files
-		}
+		jobs <- parseJob{path: f.Path, lang: f.Language}
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(resultsCh)
+	}()
+
+	var results []*parser.ParseResult
+	for pr := range resultsCh {
 		results = append(results, pr)
 	}
 	cmd.Printf("   Parsed %d files\n", len(results))
@@ -85,7 +139,16 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 	cmd.Printf("   Found %d potential vulnerabilities\n", len(findings))
 
-	// Step 5: Output report
+	// Step 5: Run external tools (Trivy, Semgrep) if available
+	extFindings, toolsUsed := integrations.RunAll(target)
+	if len(toolsUsed) > 0 {
+		cmd.Printf("   External tools: %s (%d findings)\n", strings.Join(toolsUsed, ", "), len(extFindings))
+		for _, ef := range extFindings {
+			findings = append(findings, ef.Finding)
+		}
+	}
+
+	// Step 6: Output report
 	w := cmd.OutOrStdout()
 	switch outputFmt {
 	case "sarif":
@@ -100,6 +163,19 @@ func runScan(cmd *cobra.Command, args []string) error {
 		if err := report.WriteMarkdown(w, findings); err != nil {
 			return fmt.Errorf("write markdown: %w", err)
 		}
+	case "html":
+		htmlPath := filepath.Join(os.TempDir(), "hb-report.html")
+		f, err := os.Create(htmlPath)
+		if err != nil {
+			return fmt.Errorf("create HTML file: %w", err)
+		}
+		if err := report.WriteHTML(f, findings); err != nil {
+			f.Close()
+			return fmt.Errorf("write HTML: %w", err)
+		}
+		f.Close()
+		cmd.Printf("   Report: %s\n", htmlPath)
+		openBrowser(htmlPath)
 	default:
 		return fmt.Errorf("unknown output format: %s", outputFmt)
 	}
@@ -115,4 +191,18 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	cmd.Start()
 }

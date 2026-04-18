@@ -33,6 +33,7 @@ const (
 	XSS               VulnClass = "xss"
 	HardcodedSecret   VulnClass = "hardcoded-secret"
 	PathTraversal     VulnClass = "path-traversal"
+	Deserialization   VulnClass = "insecure-deserialization"
 )
 
 // Finding represents a detected vulnerability.
@@ -98,6 +99,62 @@ var sinkRegistry = []sinkDef{
 		"Potential path traversal", "File open with potentially user-controlled path."},
 	{discovery.Go, []string{"Open", "ReadFile", "WriteFile"}, PathTraversal, Medium,
 		"Potential path traversal", "File operation with potentially user-controlled path."},
+
+	// Java sinks
+	{discovery.Java, []string{"executeQuery", "executeUpdate", "execute", "prepareStatement"}, SQLInjection, High,
+		"Potential SQL injection", "Call to JDBC execution function. Verify parameterized queries are used."},
+	{discovery.Java, []string{"exec", "getRuntime"}, CommandInjection, Critical,
+		"Potential command injection", "Call to Runtime.exec. Verify input is sanitized."},
+	{discovery.Java, []string{"openConnection", "openStream"}, SSRF, High,
+		"Potential SSRF", "HTTP connection opened. Verify URL is not user-controlled."},
+	{discovery.Java, []string{"write", "println"}, XSS, Medium,
+		"Potential XSS", "Writing to response. Verify output is escaped."},
+
+	// C# sinks
+	{discovery.CSharp, []string{"ExecuteNonQuery", "ExecuteReader", "ExecuteScalar"}, SQLInjection, High,
+		"Potential SQL injection", "Call to ADO.NET execution function. Verify parameterized queries are used."},
+	{discovery.CSharp, []string{"Start"}, CommandInjection, Critical,
+		"Potential command injection", "Call to Process.Start. Verify input is sanitized."},
+	{discovery.CSharp, []string{"GetAsync", "PostAsync", "SendAsync", "GetStringAsync"}, SSRF, High,
+		"Potential SSRF", "HTTP request function called. Verify URL is not user-controlled."},
+
+	// Rust sinks
+	{discovery.Rust, []string{"query", "execute"}, SQLInjection, High,
+		"Potential SQL injection", "Call to database execution function. Verify parameterized queries are used."},
+	{discovery.Rust, []string{"Command", "spawn", "output"}, CommandInjection, Critical,
+		"Potential command injection", "Call to process execution function. Verify input is sanitized."},
+	{discovery.Rust, []string{"get", "post", "send"}, SSRF, High,
+		"Potential SSRF", "HTTP request function called. Verify URL is not user-controlled."},
+
+	// PHP sinks (vanilla)
+	{discovery.PHP, []string{"mysql_query", "mysqli_query", "query", "exec", "prepare"}, SQLInjection, High,
+		"Potential SQL injection", "Call to database query function. Verify parameterized queries are used."},
+	{discovery.PHP, []string{"exec", "system", "passthru", "shell_exec", "popen", "proc_open"}, CommandInjection, Critical,
+		"Potential command injection", "Call to OS command execution function."},
+	{discovery.PHP, []string{"file_get_contents", "curl_exec", "fopen"}, SSRF, High,
+		"Potential SSRF", "Function may make HTTP requests. Verify URL is not user-controlled."},
+	{discovery.PHP, []string{"echo", "print"}, XSS, High,
+		"Potential XSS", "Output function called. Verify output is escaped with htmlspecialchars."},
+	{discovery.PHP, []string{"include", "require", "include_once", "require_once"}, PathTraversal, Medium,
+		"Potential path traversal / file inclusion", "File inclusion with potentially user-controlled path."},
+
+	// PHP deserialization sinks (all languages)
+	{discovery.PHP, []string{"unserialize"}, Deserialization, Critical,
+		"Insecure deserialization", "unserialize() with untrusted data enables arbitrary object injection."},
+	{discovery.Python, []string{"loads", "load"}, Deserialization, High,
+		"Potential insecure deserialization", "Pickle/YAML load with potentially untrusted data."},
+	{discovery.Java, []string{"readObject", "readUnshared"}, Deserialization, Critical,
+		"Insecure deserialization", "Java ObjectInputStream deserialization of untrusted data."},
+
+	// Laravel sinks
+	{discovery.PHP, []string{"raw", "selectRaw", "whereRaw", "orderByRaw", "groupByRaw", "havingRaw"}, SQLInjection, High,
+		"Laravel raw SQL query", "DB::raw() or raw query method bypasses Eloquent parameterization."},
+	{discovery.PHP, []string{"fromSub", "selectSub"}, SQLInjection, Medium,
+		"Laravel raw subquery", "Raw subquery may contain unsanitized input."},
+
+	// Symfony sinks
+	{discovery.PHP, []string{"executeQuery", "executeStatement"}, SQLInjection, High,
+		"Symfony/Doctrine raw query", "Doctrine DBAL direct query execution. Verify parameterized queries."},
 }
 
 // secretPatterns detects hardcoded secrets in string literals.
@@ -150,7 +207,7 @@ func (e *Engine) RunFocused(classes ...VulnClass) []Finding {
 		classSet[c] = true
 	}
 
-	if classSet[SQLInjection] || classSet[CommandInjection] || classSet[SSRF] || classSet[XSS] || classSet[PathTraversal] {
+	if classSet[SQLInjection] || classSet[CommandInjection] || classSet[SSRF] || classSet[XSS] || classSet[PathTraversal] || classSet[Deserialization] {
 		e.checkSinks(classes...)
 	}
 	if classSet[HardcodedSecret] {

@@ -263,3 +263,44 @@ func TestWriteMarkdownSeveritySummary(t *testing.T) {
 		t.Error("expected high count of 2")
 	}
 }
+
+
+func TestWriteHTML(t *testing.T) {
+	var buf bytes.Buffer
+	err := WriteHTML(&buf, sampleFindings())
+	if err != nil {
+		t.Fatalf("WriteHTML failed: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "<!DOCTYPE html>") {
+		t.Error("expected HTML doctype")
+	}
+	if !strings.Contains(output, "Honey Badger") {
+		t.Error("expected Honey Badger title")
+	}
+	if !strings.Contains(output, "HB-0001") {
+		t.Error("expected finding ID")
+	}
+	if !strings.Contains(output, "sev-critical") {
+		t.Error("expected severity class")
+	}
+	if !strings.Contains(output, "db/handler.py:42:9") {
+		t.Error("expected file location with 1-based lines")
+	}
+}
+
+func TestWriteHTMLEmpty(t *testing.T) {
+	var buf bytes.Buffer
+	WriteHTML(&buf, nil)
+	output := buf.String()
+	if !strings.Contains(output, "No vulnerabilities found") {
+		t.Error("expected empty state message")
+	}
+}
+
+func TestHTMLEscape(t *testing.T) {
+	got := htmlEscape(`<script>alert("xss")</script>`)
+	if strings.Contains(got, "<script>") {
+		t.Error("expected HTML entities, got raw tags")
+	}
+}

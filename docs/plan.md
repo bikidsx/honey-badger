@@ -15,11 +15,11 @@
 | Component | Status | Details |
 |---|---|---|
 | Go module + CLI skeleton | ✅ | cobra v1.9.1, `hb scan`, `hb understand`, `hb info`, `hb version` |
-| File discovery engine | ✅ | 9 languages detected, default ignore dirs, language filtering |
+| File discovery engine | ✅ | 13 languages detected, default ignore dirs, language filtering |
 | Tree-sitter parser | ✅ | gotreesitter v0.14.0 (pure Go, no CGO), extracts functions/calls/imports/strings |
 | Code Property Graph | ✅ | 5 node kinds, 4 edge kinds, cross-file call resolution (single-language) |
-| Vulnerability query engine | ✅ | 6 vuln classes, sink registry for Python/JS/Go, 8 secret regex patterns |
-| Report engine | ✅ | SARIF v2.1.0, JSON, Markdown |
+| Vulnerability query engine | ✅ | 7 vuln classes, sink registry for Python/JS/Go/Java/C#/Rust/PHP, 8 secret regex patterns |
+| Report engine | ✅ | SARIF v2.1.0, JSON, Markdown, HTML (auto-opens in browser) |
 | Integration tests | ✅ | Vulnerable Python+Go test app, 23 vulns found across 6 classes |
 | README | ✅ | Installation, usage, architecture, CI/CD integration |
 
@@ -33,8 +33,7 @@
 - No LLM integration
 - No taint tracking beyond call resolution
 - No `hb trace` or `hb query` commands
-- No dependency analysis (SCA)
-- No Java/C#/Rust/C++ parsing (grammars exist in gotreesitter, just not wired)
+- No dependency analysis (SCA) — but Trivy integration now available
 
 ---
 
@@ -44,21 +43,25 @@
 
 ### Tasks
 
-| Task | Priority | Effort |
+| Task | Priority | Status |
 |---|---|---|
-| GitHub Actions CI (test on push, build matrix: linux/mac/windows) | P0 | 1 day |
-| Goreleaser config for cross-platform binaries | P0 | 1 day |
-| Wire Java + C# + Rust parsers (grammars already in gotreesitter) | P1 | 1 day |
-| Add `--exclude` flag to scan (skip specific dirs/files) | P1 | 2 hours |
-| Parallel file parsing with goroutines + worker pool | P1 | 1 day |
-| Benchmark suite (parse time, CPG build time per repo size) | P2 | 1 day |
-| `hb scan --sarif-file=results.sarif` (write to file instead of stdout) | P2 | 2 hours |
-| Progress bar / spinner for large repos | P2 | 4 hours |
-| Add `.hbignore` file support | P2 | 4 hours |
+| GitHub Actions CI (test on push, build matrix: linux/mac/windows) | P0 | ✅ `.github/workflows/ci.yml` |
+| Goreleaser config for cross-platform binaries | P0 | ✅ `.goreleaser.yml` + release workflow |
+| Fix binary name (`hb` not `honey-badger`) | P0 | ✅ `cmd/hb/main.go` entrypoint |
+| Wire Java + C# + Rust + PHP parsers | P1 | ✅ 4 languages, full query patterns + sinks |
+| Add `--exclude` flag to scan (skip specific dirs/files) | P1 | ✅ Merged with discovery.Options.IgnoreDirs |
+| Parallel file parsing with goroutines + worker pool | P1 | ✅ GOMAXPROCS workers via channels |
+| Laravel/Symfony framework sinks | P1 | ✅ raw queries, Doctrine, deserialization |
+| External tool integration (Trivy + Semgrep) | P1 | ✅ `internal/integrations/` package |
+| idea.md vision document | P1 | ✅ Saved to repo root |
+| Benchmark suite (parse time, CPG build time per repo size) | P2 | To do |
+| `hb scan --sarif-file=results.sarif` (write to file instead of stdout) | P2 | To do |
+| Progress bar / spinner for large repos | P2 | To do |
+| Add `.hbignore` file support | P2 | To do |
 
 ### Exit criteria
 
-- `go install github.com/bikidsx/honey-badger@latest` works
+- `go install github.com/bikidsx/honey-badger/cmd/hb@latest` works
 - CI green on all 3 platforms
 - Release v0.1.0 tagged
 
@@ -245,7 +248,8 @@ A `.hb/patterns/` directory where users can define custom detection rules in a Y
 ### 4E — Additional Languages
 
 Wire remaining gotreesitter grammars (206 available):
-- Phase 4a: Rust, C, C++, Java, C#, PHP, Ruby
+- ~~Phase 4a: Rust, C, C++, Java, C#, PHP, Ruby~~ (Java, C#, Rust, PHP done in Phase 1.5)
+- Phase 4a: C, C++, Ruby
 - Phase 4b: Kotlin, Swift, Scala, Elixir, Dart
 - Phase 4c: Community-contributed grammars
 
@@ -262,7 +266,7 @@ Wire remaining gotreesitter grammars (206 available):
 
 | Version | Phase | Key feature |
 |---|---|---|
-| v0.1.0 | 1.5 | First public release. Single-language CPG, 6 vuln classes, SARIF output. |
+| v0.1.0 | 1.5 | First public release. 13 languages, 7 vuln classes, Trivy+Semgrep integration, SARIF output. |
 | v0.2.0 | 2A | Cross-language CPG edges (REST boundaries) |
 | v0.3.0 | 2B–C | Taint tracking + `hb trace` command |
 | v0.4.0 | 2D | `hb query` with LLM integration |
@@ -290,4 +294,4 @@ Wire remaining gotreesitter grammars (206 available):
 
 ---
 
-*Last updated: April 17, 2026*
+*Last updated: April 18, 2026*

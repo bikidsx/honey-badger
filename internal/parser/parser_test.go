@@ -229,6 +229,124 @@ CMD ["./server"]
 	}
 }
 
+func TestParseJava(t *testing.T) {
+	src := []byte(`
+import java.sql.Connection;
+import java.sql.Statement;
+
+public class UserDao {
+    public void getUser(String id) {
+        Statement stmt = conn.createStatement();
+        stmt.executeQuery("SELECT * FROM users WHERE id = " + id);
+    }
+
+    public UserDao() {}
+}
+`)
+	res, err := ParseSource("UserDao.java", discovery.Java, src)
+	if err != nil {
+		t.Fatalf("ParseSource failed: %v", err)
+	}
+	if len(res.Functions) == 0 {
+		t.Error("expected at least one method")
+	}
+	if len(res.Calls) == 0 {
+		t.Error("expected call expressions")
+	}
+	if len(res.Imports) == 0 {
+		t.Error("expected imports")
+	}
+	if len(res.Strings) == 0 {
+		t.Error("expected string literals")
+	}
+}
+
+func TestParseCSharp(t *testing.T) {
+	src := []byte(`
+using System.Data.SqlClient;
+
+public class UserService {
+    public void GetUser(string id) {
+        var cmd = new SqlCommand("SELECT * FROM users WHERE id = " + id);
+        cmd.ExecuteReader();
+    }
+}
+`)
+	res, err := ParseSource("UserService.cs", discovery.CSharp, src)
+	if err != nil {
+		t.Fatalf("ParseSource failed: %v", err)
+	}
+	if len(res.Functions) == 0 {
+		t.Error("expected at least one method")
+	}
+	if len(res.Calls) == 0 {
+		t.Error("expected call expressions")
+	}
+	if len(res.Strings) == 0 {
+		t.Error("expected string literals")
+	}
+}
+
+func TestParseRust(t *testing.T) {
+	src := []byte(`
+use std::process::Command;
+
+fn handle_request(input: &str) {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(input)
+        .output()
+        .expect("failed");
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+}
+`)
+	res, err := ParseSource("main.rs", discovery.Rust, src)
+	if err != nil {
+		t.Fatalf("ParseSource failed: %v", err)
+	}
+	if len(res.Functions) == 0 {
+		t.Error("expected at least one function")
+	}
+	funcNames := nodeNames(res.Functions)
+	assertContains(t, funcNames, "handle_request")
+	if len(res.Calls) == 0 {
+		t.Error("expected call expressions")
+	}
+	if len(res.Strings) == 0 {
+		t.Error("expected string literals")
+	}
+}
+
+func TestParsePHP(t *testing.T) {
+	src := []byte(`<?php
+use App\Models\User;
+
+function getUser($id) {
+    $result = mysqli_query($conn, "SELECT * FROM users WHERE id = " . $id);
+    return $result;
+}
+
+class UserController {
+    public function show($id) {
+        exec("ls " . $id);
+    }
+}
+?>`)
+	res, err := ParseSource("index.php", discovery.PHP, src)
+	if err != nil {
+		t.Fatalf("ParseSource failed: %v", err)
+	}
+	if len(res.Functions) == 0 {
+		t.Error("expected at least one function")
+	}
+	if len(res.Calls) == 0 {
+		t.Error("expected call expressions")
+	}
+	if len(res.Strings) == 0 {
+		t.Error("expected string literals")
+	}
+}
+
 func TestParseUnsupportedLanguage(t *testing.T) {
 	_, err := ParseSource("test.xyz", discovery.Unknown, []byte("hello"))
 	if err == nil {
@@ -305,8 +423,8 @@ func TestParseEmptyFile(t *testing.T) {
 
 func TestSupportedForParsing(t *testing.T) {
 	langs := SupportedForParsing()
-	if len(langs) < 9 {
-		t.Errorf("expected at least 9 supported languages, got %d", len(langs))
+	if len(langs) < 13 {
+		t.Errorf("expected at least 13 supported languages, got %d", len(langs))
 	}
 }
 

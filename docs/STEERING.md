@@ -41,6 +41,7 @@ internal/
   ├── parser/           Tree-sitter AST extraction
   ├── cpg/              Code Property Graph
   ├── vulnquery/        Vulnerability detection engine
+  ├── integrations/     External tool runners (Trivy, Semgrep)
   └── report/           SARIF, JSON, Markdown output
 ```
 
@@ -62,6 +63,9 @@ cpg.Build()               → *Graph (nodes + edges, call resolution)
 vulnquery.NewEngine().Run() → []Finding (vuln class, severity, location)
     │
     ▼
+integrations.RunAll()     → []ExternalFinding (Trivy CVEs, Semgrep patterns)
+    │                        merged into findings
+    ▼
 report.WriteSARIF()       → SARIF JSON to stdout/file
 ```
 
@@ -76,7 +80,7 @@ Each step is a pure function of its inputs. No global state. No singletons.
 **Purpose:** Walk a directory tree, detect programming languages by file extension, return a structured inventory.
 
 **Key types:**
-- `Language` — string enum: `python`, `javascript`, `typescript`, `go`, `sql`, `yaml`, `json`, `hcl`, `dockerfile`
+- `Language` — string enum: `python`, `javascript`, `typescript`, `go`, `java`, `csharp`, `rust`, `php`, `sql`, `yaml`, `json`, `hcl`, `dockerfile`
 - `SourceFile` — `{Path, Language, Size}`
 - `Result` — `{Root, Files, Stats}`
 - `Options` — `{IgnoreDirs, FilterLangs}`
@@ -121,6 +125,10 @@ Each step is a pure function of its inputs. No global state. No singletons.
 | JavaScript | `function_declaration`, `method_definition` | `call_expression` | `import_statement` source | `string` |
 | TypeScript | Same as JavaScript | Same as JavaScript | Same as JavaScript | `string` |
 | Go | `function_declaration`, `method_declaration` | `call_expression` | `import_spec` path | `interpreted_string_literal`, `raw_string_literal` |
+| Java | `method_declaration`, `constructor_declaration` | `method_invocation` | `import_declaration` | `string_literal` |
+| C# | `method_declaration`, `constructor_declaration` | `invocation_expression` | `using_directive` | `string_literal` |
+| Rust | `function_item` | `call_expression` | `use_declaration` | `string_literal` |
+| PHP | `function_definition`, `method_declaration` | `function_call_expression` | `namespace_use_clause` | `string`, `encapsed_string` |
 | SQL–Dockerfile | No queries | No queries | No queries | No queries |
 
 **Dependency:** `github.com/odvcencio/gotreesitter v0.14.0` — pure Go, no CGO, 206 grammars. The `Node.Type(lang)` method requires passing the `*Language`. The `NewQuery` function takes a `string`, not `[]byte`.
@@ -162,7 +170,7 @@ Each step is a pure function of its inputs. No global state. No singletons.
 
 **Key types:**
 - `Severity` — `critical`, `high`, `medium`, `low`, `info`
-- `VulnClass` — `sql-injection`, `command-injection`, `ssrf`, `xss`, `hardcoded-secret`, `path-traversal`
+- `VulnClass` — `sql-injection`, `command-injection`, `ssrf`, `xss`, `hardcoded-secret`, `path-traversal`, `insecure-deserialization`
 - `Finding` — `{ID, Class, Severity, Title, Description, File, StartRow, StartCol, EndRow, EndCol, Language, NodeID}`
 - `Engine` — holds graph reference, runs checks, collects findings
 
@@ -196,8 +204,26 @@ Add entries to `sinkRegistry` with the new language and its dangerous function n
 - **SARIF v2.1.0** — `WriteSARIF(w, findings, version)`. Proper schema URI, 1-based line numbers, rule deduplication, tool metadata.
 - **JSON** — `WriteJSON(w, findings)`. Raw finding array.
 - **Markdown** — `WriteMarkdown(w, findings)`. Severity summary table + finding details.
+- **HTML** — `WriteHTML(w, findings)`. Minimal monochrome report, dark mode aware, self-contained single file. Scan command writes to temp file and auto-opens in default browser.
 
 **SARIF notes:** Line numbers are converted from 0-based (internal) to 1-based (SARIF spec). Rules are deduplicated by `VulnClass`. Severity mapping: critical/high → "error", medium → "warning", low/info → "note".
+
+### `internal/integrations`
+
+**Purpose:** Run external security tools (Trivy, Semgrep) and normalize their output into Honey Badger findings.
+
+**Key types:**
+- `ExternalFinding` — wraps `vulnquery.Finding` with a `Source` field ("trivy" or "semgrep")
+
+**Key functions:**
+- `ToolAvailable(name) → bool` — checks if a CLI tool is on PATH
+- `RunTrivy(target) → ([]ExternalFinding, error)` — runs `trivy fs --format json`, parses CVE findings
+- `RunSemgrep(target) → ([]ExternalFinding, error)` — runs `semgrep --json --config auto`, maps check IDs to vuln classes
+- `RunAll(target) → ([]ExternalFinding, []string)` — runs all available tools, returns combined findings + tool names
+
+**Design:** Tools are optional. If not installed, runners return nil, nil (no error). Findings are normalized to 0-based line numbers and mapped to Honey Badger vuln classes where possible. Unknown Semgrep rules get a `semgrep-<check_id>` class.
+
+**Extension point:** To add a new external tool, add a `Run<Tool>` function that shells out, parses JSON, and returns `[]ExternalFinding`. Call it from `RunAll()`.
 
 ### `cmd/`
 
@@ -235,11 +261,12 @@ Add entries to `sinkRegistry` with the new language and its dangerous function n
 
 | Package | Test file | Test count | What's tested |
 |---|---|---|---|
-| `cmd/` | `cmd_test.go` | 15 | Command execution, flag parsing, output format, pipeline integration |
-| `internal/discovery/` | `discovery_test.go` | 35 subtests | Language detection (24 extensions), directory walking, filtering, ignore dirs, edge cases |
-| `internal/parser/` | `parser_test.go` | 16 | All 9 languages, malformed code, empty files, positions, file I/O |
+| `cmd/` | `cmd_test.go` | 13 | Command execution, flag parsing, output format, pipeline integration |
+| `internal/discovery/` | `discovery_test.go` | 38 subtests | Language detection (27 extensions), directory walking, filtering, ignore dirs, edge cases |
+| `internal/parser/` | `parser_test.go` | 20 | All 13 languages, malformed code, empty files, positions, file I/O |
 | `internal/cpg/` | `cpg_test.go` | 14 | Graph building, call resolution, cross-file edges, multi-language isolation, BFS reachability |
-| `internal/vulnquery/` | `vulnquery_test.go` | 17 | All 6 vuln classes, secret patterns, false positive checks, severity filtering, focused scans |
+| `internal/vulnquery/` | `vulnquery_test.go` | 17 | All 7 vuln classes, secret patterns, false positive checks, severity filtering, focused scans |
+| `internal/integrations/` | `integrations_test.go` | 6 | Trivy/Semgrep JSON parsing, severity mapping, class mapping, graceful degradation |
 | `internal/report/` | `report_test.go` | 10 | SARIF validity, field correctness, rule dedup, empty findings, markdown format |
 | `test/` | `integration_test.go` | 5 | Full pipeline end-to-end, SARIF output, language filtering, focused scan, severity filtering |
 
@@ -316,40 +343,51 @@ cobra is the de facto Go CLI framework (used by kubectl, hugo, gh). It provides 
 
 ```
 honey-badger/
-├── main.go                          Entry point
+├── main.go                          Entry point (legacy, use cmd/hb/ for install)
 ├── go.mod                           Module definition
 ├── go.sum                           Dependency checksums
 ├── README.md                        User-facing documentation
 ├── LICENSE                          MIT license
 ├── idea.md                          Original product vision document
-├── plan.md                          Phased development roadmap
-├── STEERING.md                      This file
+├── .goreleaser.yml                  Cross-platform release config
 ├── .gitignore                       Go defaults
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                   CI: test matrix (linux/mac/windows)
+│       └── release.yml              Release: goreleaser on v* tags
+├── docs/
+│   ├── plan.md                      Phased development roadmap
+│   └── STEERING.md                  This file
 ├── cmd/
+│   ├── hb/
+│   │   └── main.go                  Binary entrypoint (produces `hb` binary)
 │   ├── root.go                      Root command + global flags
-│   ├── scan.go                      Scan pipeline
+│   ├── scan.go                      Scan pipeline (parallel parsing, external tools)
 │   ├── understand.go                Codebase understanding
 │   ├── info.go                      Language info
 │   ├── version.go                   Version command
-│   └── cmd_test.go                  CLI tests (15 tests)
+│   └── cmd_test.go                  CLI tests
 ├── internal/
 │   ├── discovery/
-│   │   ├── discovery.go             File walking + language detection
-│   │   └── discovery_test.go        35 subtests
+│   │   ├── discovery.go             File walking + language detection (13 languages)
+│   │   └── discovery_test.go
 │   ├── parser/
-│   │   ├── parser.go                Tree-sitter AST extraction
-│   │   └── parser_test.go           16 tests
+│   │   ├── parser.go                Tree-sitter AST extraction (13 grammars)
+│   │   └── parser_test.go
 │   ├── cpg/
 │   │   ├── cpg.go                   Code Property Graph
-│   │   └── cpg_test.go              14 tests
+│   │   └── cpg_test.go
 │   ├── vulnquery/
-│   │   ├── vulnquery.go             Vulnerability detection
-│   │   └── vulnquery_test.go        17 tests
+│   │   ├── vulnquery.go             Vulnerability detection (7 classes, framework sinks)
+│   │   └── vulnquery_test.go
+│   ├── integrations/
+│   │   ├── integrations.go          External tool runners (Trivy, Semgrep)
+│   │   └── integrations_test.go
 │   └── report/
 │       ├── report.go                SARIF/JSON/Markdown output
-│       └── report_test.go           10 tests
+│       └── report_test.go
 ├── test/
-│   └── integration_test.go          End-to-end tests (5 tests)
+│   └── integration_test.go          End-to-end tests
 └── testdata/
     └── vulnerable-app/
         ├── app.py                   Vulnerable Python Flask app
@@ -359,4 +397,4 @@ honey-badger/
 
 ---
 
-*Last updated: April 17, 2026*
+*Last updated: April 18, 2026*

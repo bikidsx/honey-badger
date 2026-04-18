@@ -45,6 +45,10 @@ var langToFilename = map[discovery.Language]string{
 	discovery.JSON:       "file.json",
 	discovery.HCL:        "file.tf",
 	discovery.Dockerfile: "Dockerfile",
+	discovery.Java:       "file.java",
+	discovery.CSharp:     "file.cs",
+	discovery.Rust:       "file.rs",
+	discovery.PHP:        "file.php",
 }
 
 // langToGrammarFunc maps our Language to the gotreesitter grammar loader.
@@ -58,6 +62,10 @@ var langToGrammarFunc = map[discovery.Language]func() *gotreesitter.Language{
 	discovery.JSON:       grammars.JsonLanguage,
 	discovery.HCL:        grammars.HclLanguage,
 	discovery.Dockerfile: grammars.DockerfileLanguage,
+	discovery.Java:       grammars.JavaLanguage,
+	discovery.CSharp:     grammars.CSharpLanguage,
+	discovery.Rust:       grammars.RustLanguage,
+	discovery.PHP:        grammars.PhpLanguage,
 }
 
 // queryMap holds tree-sitter S-expression queries per language.
@@ -85,6 +93,30 @@ var queryMap = map[discovery.Language]languageQueries{
 		calls:     `(call_expression function: [(identifier) @name (selector_expression field: (field_identifier) @name)])`,
 		imports:   `(import_spec path: (interpreted_string_literal) @name)`,
 		strings:   `[(interpreted_string_literal) @str (raw_string_literal) @str]`,
+	},
+	discovery.Java: {
+		functions: `[(method_declaration name: (identifier) @name) (constructor_declaration name: (identifier) @name)]`,
+		calls:     `(method_invocation name: (identifier) @name)`,
+		imports:   `(import_declaration (scoped_identifier) @name)`,
+		strings:   `(string_literal) @str`,
+	},
+	discovery.CSharp: {
+		functions: `[(method_declaration name: (identifier) @name) (constructor_declaration name: (identifier) @name)]`,
+		calls:     `(invocation_expression function: [(identifier) @name (member_access_expression name: (identifier) @name)])`,
+		imports:   `(using_directive (identifier) @name)`,
+		strings:   `(string_literal) @str`,
+	},
+	discovery.Rust: {
+		functions: `(function_item name: (identifier) @name)`,
+		calls:     `(call_expression function: [(identifier) @name (field_expression field: (field_identifier) @name)])`,
+		imports:   `(use_declaration argument: (_) @name)`,
+		strings:   `(string_literal) @str`,
+	},
+	discovery.PHP: {
+		functions: `[(function_definition name: (name) @name) (method_declaration name: (name) @name)]`,
+		calls:     `(function_call_expression function: [(name) @name (member_call_expression name: (name) @name)])`,
+		imports:   `(namespace_use_clause (qualified_name) @name)`,
+		strings:   `[(string) @str (encapsed_string) @str]`,
 	},
 }
 
